@@ -14,4 +14,5 @@ setup(
     "Topic :: Database",
     "License :: OSI Approved :: MIT License"
   ],
+  install_requires = ['redis']
 )

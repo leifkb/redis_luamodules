@@ -1,9 +1,16 @@
+from redis.client import BasePipeline
 from functools import partial
 from inspect import isclass, getargspec
 try:
     import ujson as json
 except:
     import json
+
+def _pipeline_response_callback(result, **kwargs):
+    if kwargs.get('luamodule'):
+        return json.loads(result)
+    else:
+        return result
 
 class LuaModule(object):
     def __new__(cls, *args, **kwargs):
@@ -141,7 +148,16 @@ class LuaModule(object):
         if self._registered_script is None:
             self._registered_script = redis.register_script(self._compile_script())
         args = json.dumps(args)
-        return json.loads(self._registered_script(args=[name, args], client=redis))
+        if isinstance(redis, BasePipeline):
+            # Messing with redis-py's internals a bit to support pipelines,
+            # but I think in practice, this is the best way to do it.
+            redis.set_response_callback('EVALSHA', _pipeline_response_callback)
+            redis.evalsha = partial(redis.execute_command, 'EVALSHA', luamodule=True)
+            self._registered_script(args=[name, args], client=redis)
+            del redis.evalsha
+            return redis
+        else:
+            return json.loads(self._registered_script(args=[name, args], client=redis))
 
     def __getattr__(self, name):
         if name.startswith('_') or name.endswith('_') or name not in self._functions_:

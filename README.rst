@@ -6,8 +6,8 @@ This is a Python module for higher-level Redis Lua scripting. Its key feature
 is to automatically combine multiple Lua functions into a single script, so
 that your Lua functions can call each other directly. This is intended to
 allow more code reuse, and to simplify the creation of complex Lua scripts,
-including use cases where much of an application's logic happens inside of
-a Redis instance's Lua interpreter.
+including use cases where all of a program's Redis interaction is done through
+Lua.
 
 Note that this module does not use the ``KEYS`` array. As a result, it is
 **incompatible with Redis Cluster**.
@@ -75,9 +75,14 @@ functions from Lua::
             return MyLibrary.add_numbers(a, b) * 2
             '''
     
-    print(MyModule.add_and_double(2, 3)) # prints 10
-    print(MyLibrary.add_numbers(2, 2)) # error: MyLibrary doesn't have a default redis client
-    print(MyLibrary.add_numbers(2, 2, redis=redis)) # prints 4
+    print(MyModule.add_and_double(2, 3))
+    # prints 10
+    
+    print(MyLibrary.add_numbers(2, 2))
+    # error: MyLibrary doesn't have a default redis client
+    
+    print(MyLibrary.add_numbers(2, 2, redis=redis))
+    # prints 4
 
 Imports support all the features you would expect, including multiple imports
 (use a list), aliases (use a tuple, like
