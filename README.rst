@@ -104,7 +104,7 @@ has been defined::
         def foo():
             '''
             return ModuleA.foo()
-            ''''
+            '''
         
         def bar():
             '''
