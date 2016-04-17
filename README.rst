@@ -19,27 +19,27 @@ Usage example:
 
     from redis import Redis
     from redis_scripts import Scripts
-
+    
     redis = Redis(...)
-
+    
     @Scripts(redis)
     class S:
         def get_user_count(user_id):
             '''
             return tonumber(redis.call('hget', 'user_counts', user_id)) or 0
             '''
-
+        
         def incr_user_count(user_id):
             '''
             redis.call('hincrby', 'user_counts', user_id)
             '''
-
+        
         def incr_user_count_twice(user_id):
             '''
             S.incr_user_count()
             S.incr_user_count()
             '''
-
+    
     print(S.get_user_count(123))
     S.incr_user_count_twice(123)
     print(S.get_user_count(123))
