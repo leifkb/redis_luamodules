@@ -1,5 +1,9 @@
 from functools import partial
 from inspect import isclass, getargspec
+try:
+    import ujson as json
+except:
+    import json
 
 class Scripts(object):
     def __new__(cls, *args):
