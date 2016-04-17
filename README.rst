@@ -9,7 +9,7 @@ allow more code reuse, and to simplify the creation of complex Lua scripts,
 including use cases where much of an application's logic happens inside of
 a Redis instance's Lua interpreter.
 
-Note that this module does not use the KEYS array. As a result, it is
+Note that this module does not use the ``KEYS`` array. As a result, it is
 **incompatible with Redis Cluster**.
 
 ===============
@@ -75,7 +75,7 @@ functions from Lua::
             return MyLibrary.add_numbers(a, b) * 2
             '''
 
-Notice that the MyLibrary is defined without a default Redis client object.
+Notice that  ``MyLibrary`` is defined without a default Redis client object.
 If you tried to call it directly from Python like ``MyLibrary.add_numbers(2, 2)``,
 you would get an error. However, you can still call it by passing a Redis
 client as a keyword argument: ``MyLibrary.add_numbers(2, 2, redis=redis)``.
