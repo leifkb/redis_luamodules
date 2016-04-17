@@ -8,9 +8,6 @@ that your Lua functions can call each other directly. This is intended to
 simplify the creation of complex Lua scripts, including use cases where much
 of an application's logic happens inside of a Redis instance's Lua interpreter.
 
-Values passed between Lua and Python are automatically (and transparently)
-JSON-serialized to allow for a wider range of datatypes.
-
 Note that this module does not use the KEYS array. As a result, it is
 **incompatible with Redis Cluster**.
 
@@ -49,9 +46,14 @@ Usage example:
 
 As you can see, Lua functions can call each other, and the syntax for calling
 a Lua function is the same regardless of whether you call it from Python or
-Lua. Lua-to-Lua function calls 
+Lua. Lua-to-Lua function calls are just that -- normal Lua function calls --
+so they should be quite efficient, and you can refactor your Lua code into
+smaller functions as desired.
 
 This module automatically creates Lua variables for the arguments defined on
 your Python functions. Note that you must **not** include a ``self`` argument;
 these aren't really Python methods (and you're not really creating a class --
 the decorator replaces the class with an instance of Scripts).
+
+Values passed between Lua and Python are automatically (and transparently)
+JSON-serialized to allow for a wider range of datatypes.
