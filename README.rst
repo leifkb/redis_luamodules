@@ -17,6 +17,7 @@ Note that this module does not use the KEYS array. As a result, it is
 Usage example:
 ==============
 
+.. code-block:: python
     from redis import Redis
     from redis_scripts import Scripts
     
