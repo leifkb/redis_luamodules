@@ -41,7 +41,7 @@ class Scripts(object):
     def _compile_script(self, scripts):
         table_entries = []
         for name, (args, code) in scripts.iteritems():
-            function = 'function(%s) %s end' % (', '.join(args), code)
+            function = 'function(%s) %s return nil end' % (', '.join(args), code)
             table_entry = '[%r] = %s' % (name, function)
             table_entries.append(table_entry)
         table = '{' + ', '.join(table_entries) + '}'
@@ -51,7 +51,7 @@ class Scripts(object):
             do
                 local name = ARGV[1]
                 local argv = cjson.decode(ARGV[2])
-                return cjson.encode(S[name](unpack(argv)))
+                return cjson.encode(S[name](unpack(argv)) or nil)
             end
         ''' % table
 
