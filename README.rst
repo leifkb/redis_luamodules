@@ -33,7 +33,7 @@ Usage example:
         
         def incr_user_count(user_id):
             '''
-            return redis.call('hincrby', 'user_counts', user_id, 1)
+            redis.call('hincrby', 'user_counts', user_id, 1)
             '''
         
         def incr_user_count_twice(user_id):
