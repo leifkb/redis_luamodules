@@ -41,15 +41,14 @@ Usage examples:
             MyModule.incr_user_count(user_id)
             '''
     
-    print(MyModule.get_user_count(123))
+    print(MyModule.get_user_count(123)) # prints 0
     MyModule.incr_user_count_twice(123)
-    print(MyModule.get_user_count(123))
+    print(MyModule.get_user_count(123)) # prints 2
 
-As you can see, Lua functions can call each other, and the syntax for calling
-a Lua function is the same regardless of whether you call it from Python or
-Lua. Lua-to-Lua function calls are just that -- normal Lua function calls --
-so they should be quite efficient, and you can refactor your Lua code into
-smaller functions as desired.
+As you can see, the syntax for calling a Lua function is the same regardless
+of whether you call it from Python or Lua. Lua-to-Lua function calls are just
+that -- normal Lua function calls -- so they should be quite efficient, and you
+can refactor your Lua code into smaller functions as desired.
 
 ``LuaModule`` automatically creates Lua variables for the arguments defined on
 your Python functions. Note that you **must not** include a ``self`` argument;
@@ -76,16 +75,16 @@ functions from Lua::
             return MyLibrary.add_numbers(a, b) * 2
             '''
 
-Notice that the MyLibrary is defined without a Redis client object. If you
-tried to call it directly from Python like ``MyLibrary.add_numbers(2, 2)``,
+Notice that the MyLibrary is defined without a default Redis client object.
+If you tried to call it directly from Python like ``MyLibrary.add_numbers(2, 2)``,
 you would get an error. However, you can still call it by passing a Redis
 client as a keyword argument: ``MyLibrary.add_numbers(2, 2, redis=redis)``.
 
 Imports support all the features you would expect, including multiple imports
 (use a list), aliases (use a tuple, like
 ``imports=[(MyLibrary, 'MyLibraryAlias')]``), and even cyclical imports, which
-require you to call the ``LuaModule._import_`` method after a ``LuaModule``
-has been defined::
+require you to call the ``_import_`` method of a ``LuaModule`` after it has
+been defined::
 
     @LuaModule
     class ModuleA:
