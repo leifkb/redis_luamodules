@@ -47,13 +47,13 @@ Usage examples:
 
 As you can see, the syntax for calling a Lua function is the same regardless
 of whether you call it from Python or Lua. Lua-to-Lua function calls are just
-that -- normal Lua function calls -- so they should be quite efficient, and you
+that – normal Lua function calls – so they should be quite efficient, and you
 can refactor your Lua code into smaller functions as desired.
 
 ``LuaModule`` automatically creates Lua variables for the arguments defined on
 your Python functions. Note that you **must not** include a ``self`` argument;
-these aren't really Python methods (and you're not really creating a class --
-the decorator replaces the class with an instance of LuaModule).
+these aren't really Python methods. (And you're not really creating a class: the
+``@LuaModule`` decorator replaces the class with an instance of ``LuaModule``.)
 
 Values passed between Lua and Python are automatically (and transparently)
 JSON-serialized to allow for a wider range of datatypes.
@@ -74,11 +74,10 @@ functions from Lua::
             '''
             return MyLibrary.add_numbers(a, b) * 2
             '''
-
-Notice that  ``MyLibrary`` is defined without a default Redis client object.
-If you tried to call it directly from Python like ``MyLibrary.add_numbers(2, 2)``,
-you would get an error. However, you can still call it by passing a Redis
-client as a keyword argument: ``MyLibrary.add_numbers(2, 2, redis=redis)``.
+    
+    print(MyModule.add_and_double(2, 3)) # prints 10
+    print(MyLibrary.add_numbers(2, 2)) # error: MyLibrary doesn't have a default redis client
+    print(MyLibrary.add_numbers(2, 2, redis=redis)) # prints 4
 
 Imports support all the features you would expect, including multiple imports
 (use a list), aliases (use a tuple, like
