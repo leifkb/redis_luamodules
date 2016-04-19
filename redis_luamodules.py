@@ -30,7 +30,6 @@ class LuaFunction(object):
             varargs = True
         else:
             varargs = False
-        varargs = bool(argspec.varargs)
         if argspec.keywords:
             raise TypeError('LuaModule does not support kwargs on Lua functions.')
         if argspec.defaults is None:

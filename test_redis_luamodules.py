@@ -80,6 +80,15 @@ def test_vararg(BasicModule):
     assert BasicModule.vararg(1, 2, 3) == [2, 3]
     assert BasicModule.vararg(1, 2, 3, 4) == [2, 3]
 
+def test_pipeline(redis, BasicModule):
+    with redis.pipeline() as pipe:
+        s = pipe.register_script('return 123')
+        s()
+        assert BasicModule.foo(1, 2, redis=pipe) is pipe
+        a, b = pipe.execute()
+    assert a == 123
+    assert b == [1, 2, 3]
+
 def test_redis_setting(redis):
     @LuaModule
     class MyModule:
