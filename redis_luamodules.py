@@ -166,11 +166,7 @@ class LuaModule(object):
         return '''
         {initialize_modules}
         {set_modules}
-        do
-            local name = ARGV[1]
-            local argv = cjson.decode(ARGV[2])
-            return cjson.encode({own_name}[name](unpack(argv)) or nil)
-        end
+        return cjson.encode({own_name}[ARGV[1]](unpack(cjson.decode(ARGV[2]))) or nil)
         '''.format(
             initialize_modules=initialize_modules,
             set_modules=set_modules,
