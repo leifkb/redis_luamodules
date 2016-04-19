@@ -13,7 +13,7 @@ def _pipeline_response_callback(result, **kwargs):
         return result
 
 class LuaFunction(object):
-    def __init__(self, code, arg_names, first_optional_index=None, varargs=False):
+    def __init__(self, arg_names, code, first_optional_index=None, varargs=False):
         self.code = code
         self.arg_names = arg_names
         self.first_optional_index = first_optional_index
@@ -33,7 +33,7 @@ class LuaFunction(object):
             if not all(default is None for default in argspec.defaults):
                 raise TypeError('Any default argument values for Lua functions must be None.')
             first_optional_index = len(arg_names) - len(argspec.defaults)
-        return cls(code, arg_names, first_optional_index, varargs)
+        return cls(arg_names, code, first_optional_index, varargs)
     
     @property
     def arg_count_range(self):
@@ -113,11 +113,16 @@ class LuaModule(object):
             if method_name.endswith('_'):
                 continue
             method = getattr(other_cls, method_name)
+            
+            if isinstance(method, LuaFunction):
+                yield method_name, method
+                continue
+                
             try:
                 argspec = getargspec(method)
             except TypeError:
                 continue
-            yield method.__name__, LuaFunction.from_python_argspec(method.__doc__, argspec)
+            yield method_name, LuaFunction.from_python_argspec(method.__doc__, argspec)
     
     def _compile_module(self, module_map):
         self._compile_called = True
