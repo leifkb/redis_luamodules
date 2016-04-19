@@ -14,5 +14,7 @@ setup(
     "Topic :: Database",
     "License :: OSI Approved :: MIT License"
   ],
-  install_requires = ['redis']
+  install_requires = ['redis'],
+  setup_requires=['pytest-runner'],
+  tests_require=['pytest']
 )
