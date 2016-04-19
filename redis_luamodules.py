@@ -121,24 +121,27 @@ class LuaModule(object):
     
     def _compile_module(self, module_map):
         self._compile_called = True
-        import_as_names = [import_as for module, import_as in self._imports_]
-        import_as_names.append(self._name_)
-        import_as_names = ', '.join(import_as_names)
-        set_modules = '\n'.join('%s = %s' % (import_as, module_map[module]) for module, import_as in self._imports_)
+        imports = [(import_as, module_map[module]) for module, import_as in self._imports_]
+        import_names = []
+        global_names = []
+        for module, import_as in self._imports_:
+            import_names.append(import_as)
+            global_names.append(module_map[module])
+        import_names.append(self._name_)
+        global_names.append(module_map[self])
+        imports.append((self._name_, module_map[self]))
+        imports = ', '.join('%s = %s' % x for x in imports)
         set_functions = '\n'.join('%s[%r] = function(%s) %s end' % (self._name_, func_name, func.lua_argdef, func.code) for func_name, func in self._functions_.iteritems())
         return '''
         do
-            local {import_as_names}
-            {own_import_name} = {own_name}
-            {set_modules}
+            local {import_names} = {global_names}
             {set_functions}
         end
         '''.format(
-            import_as_names=import_as_names,
-            set_modules=set_modules,
-            set_functions=set_functions,
-            own_name=module_map[self],
-            own_import_name=self._name_
+            import_names=', '.join(import_names),
+            global_names=', '.join(global_names),
+            imports=imports,
+            set_functions=set_functions
         )
     
     def _all_imports_recurse(self, s):
@@ -160,15 +163,14 @@ class LuaModule(object):
         for module in all_imports:
             module_map[module] = '_LuaModule%s__%s' % (n, module._name_)
             n += 1
-        initialize_modules = '\n'.join('local %s = {}' % module_name for module, module_name in module_map.iteritems())
         set_modules = '\n'.join(module._compile_module(module_map) for module in module_map)
-        
         return '''
-        {initialize_modules}
+        local {module_names} = {blank_tables}
         {set_modules}
         return cjson.encode({own_name}[ARGV[1]](unpack(cjson.decode(ARGV[2]))) or nil)
         '''.format(
-            initialize_modules=initialize_modules,
+            module_names=', '.join(module_map.itervalues()),
+            blank_tables=', '.join(['{}'] * len(module_map)),
             set_modules=set_modules,
             own_name=module_map[self]
         )
