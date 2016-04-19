@@ -24,6 +24,12 @@ class LuaFunction(object):
         if not all(isinstance(arg, basestring) for arg in argspec.args):
             raise TypeError('Lua function do not support unpacking.')
         arg_names = argspec.args
+        if argspec.varargs:
+            if argspec.varargs != 'arg':
+                raise TypeError('Lua vararg variable must be named "arg".')
+            varargs = True
+        else:
+            varargs = False
         varargs = bool(argspec.varargs)
         if argspec.keywords:
             raise TypeError('LuaModule does not support kwargs on Lua functions.')
@@ -39,7 +45,10 @@ class LuaFunction(object):
     def arg_count_range(self):
         """Returns (min_args, max_args) tuple, where max_args can be None."""
         
-        min_args = min(self.first_optional_index, len(self.arg_names))
+        if self.first_optional_index is None:
+            min_args = len(self.arg_names)
+        else:
+            min_args = min(self.first_optional_index, len(self.arg_names))
         if self.varargs:
             max_args = None
         else:
@@ -73,6 +82,10 @@ class LuaFunction(object):
             arg_names = list(arg_names)
             arg_names.append('...')
         return ', '.join(arg_names)
+    
+    @property
+    def lua_funcdef(self):
+        return 'function(%s) %s end' % (self.lua_argdef, self.code)
 
 class LuaModule(object):
     def __new__(cls, *args, **kwargs):
@@ -97,7 +110,7 @@ class LuaModule(object):
             self = object.__new__(cls)
             self._name_ = table_name
             self._compile_called = False
-            self._imports_ = []
+            self._imports_ = [(self, self._name_)]
             if imports:
                 self._import_(imports)
             if isclass(functions):
@@ -126,17 +139,15 @@ class LuaModule(object):
     
     def _compile_module(self, module_map):
         self._compile_called = True
-        imports = [(import_as, module_map[module]) for module, import_as in self._imports_]
         import_names = []
         global_names = []
         for module, import_as in self._imports_:
             import_names.append(import_as)
             global_names.append(module_map[module])
-        import_names.append(self._name_)
-        global_names.append(module_map[self])
-        imports.append((self._name_, module_map[self]))
-        imports = ', '.join('%s = %s' % x for x in imports)
-        set_functions = '\n'.join('%s[%r] = function(%s) %s end' % (self._name_, func_name, func.lua_argdef, func.code) for func_name, func in self._functions_.iteritems())
+        set_functions = '\n'.join(
+            '%s[%r] = %s' % (self._name_, func_name, func.lua_funcdef)
+            for func_name, func in self._functions_.iteritems()
+        )
         return '''
         do
             local {import_names} = {global_names}
@@ -145,7 +156,6 @@ class LuaModule(object):
         '''.format(
             import_names=', '.join(import_names),
             global_names=', '.join(global_names),
-            imports=imports,
             set_functions=set_functions
         )
     
@@ -181,8 +191,6 @@ class LuaModule(object):
         )
     
     def _import_name_used(self, name):
-        if name == self._name_:
-            return True
         for module, import_as in self._imports_:
             if import_as == name:
                 return True
