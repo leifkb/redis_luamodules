@@ -2,14 +2,13 @@
 redis_luamodules: Higher-level Redis Lua scripting
 ***********************************************
 
-This is a Python module for higher-level Redis Lua scripting. Its key feature
-is to automatically combine multiple Lua functions into a single script, so
-that your Lua functions can call each other directly. This is intended to
-allow more code reuse, and to simplify the creation of complex Lua scripts,
-including use cases where all of a program's Redis interaction is done through
-Lua.
+This is a Python library for higher-level Redis Lua scripting. Its key feature
+is to automatically combine multiple Lua functions into a single script,
+allowing your Lua functions to call each other directly. This allows more code
+reuse, and simplifies the creation of complex Lua scripts, including use
+cases where all of a program's Redis interaction is done through Lua.
 
-Note that this module does not use the ``KEYS`` array. As a result, it is
+Note that this library does not use the ``KEYS`` array. As a result, it is
 **incompatible with Redis Cluster**.
 
 ===============

@@ -12,6 +12,68 @@ def _pipeline_response_callback(result, **kwargs):
     else:
         return result
 
+class LuaFunction(object):
+    def __init__(self, code, arg_names, first_optional_index=None, varargs=False):
+        self.code = code
+        self.arg_names = arg_names
+        self.first_optional_index = first_optional_index
+        self.varargs = varargs
+    
+    @classmethod
+    def from_python_argspec(cls, code, argspec):
+        if not all(isinstance(arg, basestring) for arg in argspec.args):
+            raise TypeError('Lua function do not support unpacking.')
+        arg_names = argspec.args
+        varargs = bool(argspec.varargs)
+        if argspec.keywords:
+            raise TypeError('LuaModule does not support kwargs on Lua functions.')
+        if argspec.defaults is None:
+            first_optional_index = None
+        else:
+            if not all(default is None for default in argspec.defaults):
+                raise TypeError('Any default argument values for Lua functions must be None.')
+            first_optional_index = len(arg_names) - len(argspec.defaults)
+        return cls(code, arg_names, first_optional_index, varargs)
+    
+    @property
+    def arg_count_range(self):
+        """Returns (min_args, max_args) tuple, where max_args can be None."""
+        
+        min_args = min(self.first_optional_index, len(self.arg_names))
+        if self.varargs:
+            max_args = None
+        else:
+            max_args = len(self.arg_names)
+        return min_args, max_args
+    
+    @property
+    def arg_count_range_text(self):
+        """Text describing the arg count range."""
+        
+        min_args, max_args = self.arg_count_range
+        if min_args == max_args:
+            return 'exactly %s' % min_args
+        elif max_args is None:
+            return 'at least %s' % min_args
+        else:
+            return 'between %s and %s' % (min_args, max_args)
+    
+    def arg_count_valid(self, n):
+        min_args, max_args = self.arg_count_range
+        if n < min_args:
+            return False
+        if max_args is not None and n > max_args:
+            return False
+        return True
+    
+    @property
+    def lua_argdef(self):
+        arg_names = self.arg_names
+        if self.varargs:
+            arg_names = list(arg_names)
+            arg_names.append('...')
+        return ', '.join(arg_names)
+
 class LuaModule(object):
     def __new__(cls, *args, **kwargs):
         if len(args) == 0 and kwargs:
@@ -55,7 +117,7 @@ class LuaModule(object):
                 argspec = getargspec(method)
             except TypeError:
                 continue
-            yield method.__name__, (argspec.args, method.__doc__)
+            yield method.__name__, LuaFunction.from_python_argspec(method.__doc__, argspec)
     
     def _compile_module(self, module_map):
         self._compile_called = True
@@ -63,7 +125,7 @@ class LuaModule(object):
         import_as_names.append(self._name_)
         import_as_names = ', '.join(import_as_names)
         set_modules = '\n'.join('%s = %s' % (import_as, module_map[module]) for module, import_as in self._imports_)
-        set_functions = '\n'.join('%s[%r] = function(%s) %s end' % (self._name_, function_name, ', '.join(args), code) for function_name, (args, code) in self._functions_.iteritems())
+        set_functions = '\n'.join('%s[%r] = function(%s) %s end' % (self._name_, func_name, func.lua_argdef, func.code) for func_name, func in self._functions_.iteritems())
         return '''
         do
             local {import_as_names}
@@ -99,7 +161,7 @@ class LuaModule(object):
             module_map[module] = '_LuaModule%s__%s' % (n, module._name_)
             n += 1
         initialize_modules = '\n'.join('local %s = {}' % module_name for module, module_name in module_map.iteritems())
-        set_modules = '\n'.join('%s' % (module._compile_module(module_map)) for module, module_name in module_map.iteritems())
+        set_modules = '\n'.join(module._compile_module(module_map) for module in module_map)
         
         return '''
         {initialize_modules}
@@ -142,9 +204,12 @@ class LuaModule(object):
         redis = kwargs.pop('redis', None)
         if kwargs:
             raise TypeError('Excess kwargs: %s' % kwargs.keys())
-        if redis is None and self._redis_ is None:
-            raise TypeError('No redis client specified calling LuaModule, which was created without a default redis client.')
+        func = self._functions_[name]
+        if not func.arg_count_valid(len(args)):
+            raise TypeError('Wrong number of args to LuaModule %s.%s; expected %s, got %s' % (self._name_, name, func.arg_count_range_text, len(args)))
         redis = redis or self._redis_
+        if redis is None:
+            raise TypeError('This LuaModule was created without a default Redis client, so you need to specify one in a kwarg: %s.%s(..., redis=redis)' % (self._name_, name))
         if self._registered_script is None:
             self._registered_script = redis.register_script(self._compile_script())
         args = json.dumps(args)
