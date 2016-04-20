@@ -159,14 +159,13 @@ class LuaModule(object):
         )
     
     def _all_imports_recurse(self, s):
+        s.add(self)
         for module, import_as in self._imports_:
             if module not in s:
-                s.add(module)
                 module._all_imports_recurse(s)
     
     def _all_imports(self):
         s = set()
-        s.add(self)
         self._all_imports_recurse(s)
         return s
     
@@ -190,10 +189,7 @@ class LuaModule(object):
         )
     
     def _import_name_used(self, name):
-        for module, import_as in self._imports_:
-            if import_as == name:
-                return True
-        return False
+        return any(import_as == name for module, import_as in self._imports_)
     
     def _import_(self, imports):
         if self._compile_called:

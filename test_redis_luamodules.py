@@ -127,11 +127,69 @@ def test_aliased_imports(redis):
             return 456456
             '''
     
-    @LuaModule(redis, imports=(Library, 'AliasOfLibrary'))
+    Library1 = Library
+    
+    @LuaModule
+    class Library:
+        def foo():
+            '''
+            return 123123
+            '''
+    
+    Library2 = Library
+    
+    with pytest.raises(ValueError):
+        @LuaModule(redis, imports=[Library1, Library2])
+        class LibraryConsumer:
+            def foo():
+                '''
+                return AliasOfLibrary.foo() + 1
+                '''
+    
+    @LuaModule(redis, imports=[Library1, (Library2, 'Library2')])
     class LibraryConsumer:
         def foo():
             '''
-            return AliasOfLibrary.foo() + 1
+            return Library.foo() + 1
+            '''
+        
+        def bar():
+            '''
+            return Library2.foo() + 1
             '''
     
     assert LibraryConsumer.foo() == 456457
+    assert LibraryConsumer.bar() == 123124
+
+def test_crazy_self_aliases(redis):
+    @LuaModule(redis)
+    class CrazyModule:
+        def foo(n):
+            '''
+            if n == 3 then
+                return CrazyModuleAlias0.foo(2)
+            elseif n == 2 then
+                return CrazyModuleAlias1.foo(1)
+            elseif n == 1 then
+                return CrazyModuleAlias2.foo(0)
+            elseif n == 0 then
+                return "hi!"
+            else
+                return nil
+            end
+            '''
+    
+    with pytest.raises(ValueError):
+        CrazyModule._import_(CrazyModule)
+    
+    CrazyModule._import_([
+        (CrazyModule, 'CrazyModuleAlias0'),
+        (CrazyModule, 'CrazyModuleAlias1'),
+        (CrazyModule, 'CrazyModuleAlias2')
+    ])
+    
+    assert CrazyModule.foo(4) is None
+    assert CrazyModule.foo(3) == "hi!"
+    assert CrazyModule.foo(2) == "hi!"
+    assert CrazyModule.foo(1) == "hi!"
+    assert CrazyModule.foo(0) == "hi!"
