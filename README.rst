@@ -114,4 +114,29 @@ been defined::
             '''
     
     ModuleA._import_(ModuleB)
-            
+
+Individual Lua functions can be defined without syntactic sugar, as either a
+tuple ``(arg_list, lua_code)`` or a ``LuaFunction`` object. This is useful if
+you want to generate the code for a Lua function dynamically, or to load it
+from a file::
+
+  @LuaModule
+  class MyModule:
+      def foo():
+          '''
+          return 1
+          '''
+      
+      bar = ([], 'return 2')
+      baz = LuaFunction(['x'], 'return x or 3', first_optional_index=0)
+
+It is also possible to define an entire LuaModule without syntactic sugar::
+
+    MyModule = LuaModule('MyModule', {
+        'foo': ([], 'return 1'),
+        'bar': LuaFunction([], 'return 2')  
+    })
+
+To see the generated Lua code, use the ``_compile_()`` method of a ``LuaModule``::
+
+    print(MyModule._compile_())

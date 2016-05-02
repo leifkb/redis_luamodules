@@ -13,11 +13,46 @@ def _pipeline_response_callback(result, **kwargs):
         return result
 
 class LuaFunction(object):
+    '''Create a LuaFunction like:
+    LuaFunction(['arg1', 'arg2'], 'return {"hello from lua", arg1+arg2}')
+    
+    Constructor supports two optional arguments:
+    first_optional_index (all optional arguments have a nil default value)
+    varargs (boolean, will use standard Lua varargs scheme)
+    '''
+    
     def __init__(self, arg_names, code, first_optional_index=None, varargs=False):
         self.code = code
         self.arg_names = arg_names
         self.first_optional_index = first_optional_index
         self.varargs = varargs
+    
+    @classmethod
+    def from_obj(cls, obj):
+        '''Converts an object to a LuaFunction, if possible. Supported objects:
+        
+        A 2-tuple: (arg_names, lua_code)
+        A LuaFunction (which will be returned unmodified)
+        A Python function (its argspec will be appropriated, and its docstring
+        should contain Lua code)
+        
+        Raises TypeError if this is not a supported type of object.
+        '''
+        
+        if isinstance(obj, LuaFunction):
+            return obj
+        
+        try:
+            arg_names, lua_code = obj
+        except (TypeError, ValueError):
+            pass
+        else:
+            return cls(arg_names, lua_code)
+        
+        # This will raise TypeError if it's not a function/method.
+        argspec = getargspec(obj)
+        
+        return cls.from_python_argspec(obj.__doc__, argspec)
     
     @classmethod
     def from_python_argspec(cls, code, argspec):
@@ -87,37 +122,96 @@ class LuaFunction(object):
         return 'function(%s) %s end' % (self.lua_argdef, self.code)
 
 class LuaModule(object):
+    '''A LuaModule can be created using a decorator as syntactic sugar like:
+    
+    @LuaModule
+    class MyModule:
+        def my_function(x, y, z):
+            """
+            return x+y*z
+            """
+    
+    (Note that there should not be a "self" argument.)
+    
+    Individual Lua functions can also be defined as (arg_names, code) tuples,
+    or as LuaFunction objects. This allows code to be dynamically generated, or
+    loaded from a file:
+    
+    @LuaModule:
+    class MyModule:
+        my_function = (['x', 'y', 'z'], 'return x+y*z')
+    
+    Alternatively, the whole LuaModule can be defined without syntactic sugar:
+    
+    MyModule = LuaModule('MyModule', {
+        'my_function': (['x', 'y', 'z'], 'return x+y*z')
+    })
+    
+    Because LuaModule functions are called like methods (MyModule.my_function()),
+    all Python methods are prefixed with an underscore to avoid conflict.
+    Methods with underscores on _both_sides_ are intended as external API; e.g.,
+    you can see the compiled Lua code of a LuaModule like:
+    
+    print(MyModule._compile_())
+    
+    And you can add imports to a module like:
+    
+    MyModule._import_(ModuleA)
+    MyModule._import_(('ModuleA', 'AliasA'))
+    MyModule._import_([ModuleA, (ModuleB, 'AliasB')])
+    '''
+    
     def __new__(cls, *args, **kwargs):
-        if len(args) == 0 and kwargs:
+        if len(args) == 0:
             return partial(LuaModule, **kwargs)
         elif len(args) == 1 and isclass(args[0]):
             return LuaModule(None, args[0], **kwargs)
         elif len(args) == 1: # redis
             return partial(LuaModule, args[0], **kwargs)
-        else:
-            if len(args) == 2:
-                redis, functions = args
+
+        if len(args) == 2:
+            redis_or_name, functions = args
+            if isinstance(redis_or_name, basestring):
+                redis = None
+                name = redis_or_name
             else:
-                raise TypeError('Wrong number of args')
-            table_name = kwargs.pop('name', None)
-            if table_name is None:
-                table_name = getattr(functions, '__name__', 'S')
-            imports = kwargs.pop('imports', None)
-            if kwargs:
-                raise TypeError('Excess kwargs: %s' % kwargs)
-            
-            self = object.__new__(cls)
-            self._name_ = table_name
-            self._compile_called = False
-            self._imports_ = [(self, self._name_)]
-            if imports:
-                self._import_(imports)
-            if isclass(functions):
-                functions = self._extract_lua_from_class(functions)
-            self._functions_ = dict(functions)
-            self._registered_script = None
-            self._redis_ = redis
-            return self
+                redis = redis_or_name
+                name = None
+        elif len(args) == 3:
+            name, redis, functions = args
+        else:
+            raise TypeError('Wrong number of args')
+        
+        if name is None:
+            name = kwargs.pop('name', None)
+        if name is None:
+            name = getattr(functions, '__name__', None)
+        if name is None:
+            raise TypeError('Name not specified.')
+        
+        if redis is None:
+            redis = kwargs.pop('redis', None)
+        
+        imports = kwargs.pop('imports', None)
+        if kwargs:
+            raise TypeError('Excess kwargs: %s' % kwargs)
+        
+        self = object.__new__(cls)
+        self._name_ = name
+        self._compile_called = False
+        self._imports_ = [(self, self._name_)]
+        if imports:
+            self._import_(imports)
+        if isclass(functions):
+            functions = self._extract_lua_from_class(functions)
+        else:
+            functions = dict(functions)
+            for f_name, f in functions.iteritems():
+                functions[f_name] = LuaFunction.from_obj(f)
+        self._functions_ = dict(functions)
+        self._registered_script = None
+        self._redis_ = redis
+        return self
 
     @classmethod
     def _extract_lua_from_class(cls, other_cls):
@@ -125,16 +219,11 @@ class LuaModule(object):
             if method_name.endswith('_'):
                 continue
             method = getattr(other_cls, method_name)
-            
-            if isinstance(method, LuaFunction):
-                yield method_name, method
-                continue
-                
             try:
-                argspec = getargspec(method)
+                f = LuaFunction.from_obj(method)
             except TypeError:
                 continue
-            yield method_name, LuaFunction.from_python_argspec(method.__doc__, argspec)
+            yield method_name, f
     
     def _compile_module(self, module_map):
         self._compile_called = True
@@ -169,7 +258,7 @@ class LuaModule(object):
         self._all_imports_recurse(s)
         return s
     
-    def _compile_script(self):
+    def _compile_(self):
         all_imports = self._all_imports()
         n = 0
         module_map = {}
@@ -217,7 +306,7 @@ class LuaModule(object):
         if redis is None:
             raise TypeError('This LuaModule was created without a default Redis client, so you need to specify one in a kwarg: %s.%s(..., redis=redis)' % (self._name_, name))
         if self._registered_script is None:
-            self._registered_script = redis.register_script(self._compile_script())
+            self._registered_script = redis.register_script(self._compile_())
         args = json.dumps(args)
         if isinstance(redis, BasePipeline):
             # Messing with redis-py's internals a bit to support pipelines,

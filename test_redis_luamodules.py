@@ -141,10 +141,7 @@ def test_aliased_imports(redis):
     with pytest.raises(ValueError):
         @LuaModule(redis, imports=[Library1, Library2])
         class LibraryConsumer:
-            def foo():
-                '''
-                return AliasOfLibrary.foo() + 1
-                '''
+            pass
     
     @LuaModule(redis, imports=[Library1, (Library2, 'Library2')])
     class LibraryConsumer:
@@ -193,3 +190,40 @@ def test_crazy_self_aliases(redis):
     assert CrazyModule.foo(2) == "hi!"
     assert CrazyModule.foo(1) == "hi!"
     assert CrazyModule.foo(0) == "hi!"
+
+def test_compile(BasicModule):
+    assert BasicModule._compile_()
+
+def test_sugarless_functions(redis):
+    @LuaModule(redis)
+    class MyModule:
+        def sugar(n):
+            '''
+            return {"sugar", n+1}
+            '''
+        
+        sugarless1 = (['n'], 'return {"sugarless1", n+2}')
+        
+        sugarless2 = LuaFunction(['n'], 'return {"sugarless2", (n or 100)+3}', first_optional_index=0)
+    
+    assert MyModule.sugar(200) == ['sugar', 201]
+    assert MyModule.sugarless1(200) == ['sugarless1', 202]
+    assert MyModule.sugarless2(200) == ['sugarless2', 203]
+    assert MyModule.sugarless2() == ['sugarless2', 103]
+    with pytest.raises(TypeError):
+        MyModule.sugarless1()
+    with pytest.raises(TypeError):
+        MyModule.sugarless2(1, 2)
+
+def test_sugarless_module(redis):
+    f_dict = {
+        'foo': ([], 'return AModule.bar()'),
+        'bar': ([], 'return "bar"')
+    }
+    MyModule = LuaModule('AModule', f_dict)
+    with pytest.raises(TypeError):
+        MyModule.foo()
+    assert MyModule.foo(redis=redis) == 'bar'
+    
+    MyModule = LuaModule('AModule', redis, f_dict)
+    assert MyModule.foo() == 'bar'
