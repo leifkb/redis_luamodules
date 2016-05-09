@@ -5,6 +5,7 @@ try:
     import ujson as json
 except:
     import json
+from time import time
 
 def _pipeline_response_callback(result, **kwargs):
     if kwargs.get('luamodule'):
@@ -267,10 +268,12 @@ class LuaModule(object):
             n += 1
         set_modules = '\n'.join(module._compile_module(module_map) for module in module_map)
         return '''
+        local NOW = {now}
         local {module_names} = {blank_tables}
         {set_modules}
         return cjson.encode({own_name}[ARGV[1]](unpack(cjson.decode(ARGV[2]))) or nil)
         '''.format(
+            now=time(),
             module_names=', '.join(module_map.itervalues()),
             blank_tables=', '.join(['{}'] * len(module_map)),
             set_modules=set_modules,

@@ -5,7 +5,7 @@ from tempfile import mkstemp
 import os
 from redis import Redis, ConnectionError
 from subprocess import Popen
-from time import sleep
+from time import sleep, time
 
 @pytest.fixture(scope='module')
 def redis(request):
@@ -227,3 +227,13 @@ def test_sugarless_module(redis):
     
     MyModule = LuaModule('AModule', redis, f_dict)
     assert MyModule.foo() == 'bar'
+
+def test_now(redis):
+    @LuaModule(redis)
+    class MyModule:
+        def now():
+            '''
+            return NOW
+            '''
+            
+    assert abs(MyModule.now() - time()) < 1

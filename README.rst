@@ -128,9 +128,10 @@ from a file::
           '''
       
       bar = ([], 'return 2')
+      
       baz = LuaFunction(['x'], 'return x or 3', first_optional_index=0)
 
-It is also possible to define an entire LuaModule without syntactic sugar::
+It is also possible to define an entire ``LuaModule`` without syntactic sugar::
 
     MyModule = LuaModule('MyModule', {
         'foo': ([], 'return 1'),
