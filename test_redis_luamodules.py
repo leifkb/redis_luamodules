@@ -235,5 +235,7 @@ def test_now(redis):
             '''
             return NOW
             '''
-            
-    assert abs(MyModule.now() - time()) < 1
+    
+    assert abs(MyModule.now() - time()) < 0.1
+    sleep(1)
+    assert abs(MyModule.now() - time()) < 0.1

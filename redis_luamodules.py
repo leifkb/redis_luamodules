@@ -268,12 +268,11 @@ class LuaModule(object):
             n += 1
         set_modules = '\n'.join(module._compile_module(module_map) for module in module_map)
         return '''
-        local NOW = {now}
+        local NOW = tonumber(ARGV[3])
         local {module_names} = {blank_tables}
         {set_modules}
         return cjson.encode({own_name}[ARGV[1]](unpack(cjson.decode(ARGV[2]))) or nil)
         '''.format(
-            now=time(),
             module_names=', '.join(module_map.itervalues()),
             blank_tables=', '.join(['{}'] * len(module_map)),
             set_modules=set_modules,
@@ -316,11 +315,11 @@ class LuaModule(object):
             # but I think in practice, this is the best way to do it.
             redis.set_response_callback('EVALSHA', _pipeline_response_callback)
             redis.evalsha = partial(redis.execute_command, 'EVALSHA', luamodule=True)
-            self._registered_script(args=[name, args], client=redis)
+            self._registered_script(args=[name, args, time()], client=redis)
             del redis.evalsha
             return redis
         else:
-            return json.loads(self._registered_script(args=[name, args], client=redis))
+            return json.loads(self._registered_script(args=[name, args, time()], client=redis))
 
     def __getattr__(self, name):
         if name.startswith('_') or name.endswith('_') or name not in self._functions_:
